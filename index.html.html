@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #gravitySlider {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+
+        #clearButton {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            outline: none;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #clearButton:hover {
+            background-color: #2980b9;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <input type="range" id="gravitySlider" min="0" max="1" step="0.1" value="0.1" />
+    <button id="clearButton">Clear Particles</button>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // Colors
+        const WHITE = "#ffffff";
+        let GRAVITY = 0.1;
+        const PARTICLE_INTERVAL = 10; // Set the interval for spawning particles (in milliseconds)
+
+        // Particle class
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 3; // Particle radius
+                this.velX = Math.random() * 4 - 2;
+                this.velY = Math.random() * 4 - 2;
+                this.color = `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`;
+            }
+
+            update() {
+                this.velY += GRAVITY;
+                this.x += this.velX;
+                this.y += this.velY;
+
+                // Bounce off walls
+                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+                    this.velX *= -0.8;
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+                    this.velY *= -0.8;
+                    this.y = Math.min(canvas.height - this.radius, this.y); // Prevent particles from going below the canvas
+                }
+            }
+
+            draw(context) {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+                context.fill();
+            }
+
+            checkCollision(otherParticle) {
+                const dx = otherParticle.x - this.x;
+                const dy = otherParticle.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance < this.radius + otherParticle.radius;
+            }
+        }
+
+        // Set up the canvas
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext("2d");
+        const particles = []; // Array to store particles
+        let isMouseDown = false;
+        let lastMousePosition = { x: 0, y: 0 };
+
+        // Update canvas size based on window size
+        function updateCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Handle window resize events
+        window.addEventListener('resize', updateCanvasSize);
+
+        // Function to create a new particle
+        function createParticle(x, y) {
+            particles.push(new Particle(x, y));
+        }
+
+        // Main game loop
+        function gameLoop() {
+            // Clear the canvas
+            context.fillStyle = WHITE;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw particles
+            for (let i = 0; i < particles.length; i++) {
+                const particle = particles[i];
+                particle.update();
+                particle.draw(context);
+
+                // Check for collisions with other particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    const otherParticle = particles[j];
+                    if (particle.checkCollision(otherParticle)) {
+                        // Simple collision response - swap velocities
+                        const tempVelX = particle.velX;
+                        const tempVelY = particle.velY;
+                        particle.velX = otherParticle.velX;
+                        particle.velY = otherParticle.velY;
+                        otherParticle.velX = tempVelX;
+                        otherParticle.velY = tempVelY;
+                    }
+                }
+            }
+
+            // Request next frame
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize canvas size
+        updateCanvasSize();
+
+        // Handle mouse events
+        window.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left mouse button
+                isMouseDown = true;
+                lastMousePosition = { x: event.clientX, y: event.clientY };
+                createParticle(event.clientX, event.clientY);
+            }
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            if (isMouseDown) {
+                const dx = event.clientX - lastMousePosition.x;
+                const dy = event.clientY - lastMousePosition.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > PARTICLE_INTERVAL) {
+                    lastMousePosition = { x: event.clientX, y: event.clientY };
+                    createParticle(event.clientX, event.clientY);
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        // Slider for gravity
+        const gravitySlider = document.getElementById("gravitySlider");
+        gravitySlider.addEventListener('input', (event) => {
+            GRAVITY = parseFloat(event.target.value);
+        });
+
+        // Button to clear particles
+        const clearButton = document.getElementById("clearButton");
+        clearButton.addEventListener('click', () => {
+            particles.length = 0; // Clear the particles array
+        });
+
+        // Start the game loop
+        gameLoop();
+    </script>
+</body>
+</html>
