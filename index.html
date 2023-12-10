@@ -41,11 +41,55 @@
             background-color: #2980b9;
             transform: scale(1.05);
         }
+
+        #sizeToggleButton {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #2ecc71;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            outline: none;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #sizeToggleButton:hover {
+            background-color: #27ae60;
+            transform: scale(1.05);
+        }
+
+        #forceButton {
+            position: absolute;
+            top: 140px;
+            left: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #e74c3c;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            outline: none;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #forceButton:hover {
+            background-color: #c0392b;
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
     <input type="range" id="gravitySlider" min="0" max="1" step="0.1" value="0.1" />
     <button id="clearButton">Clear Particles</button>
+    <button id="sizeToggleButton">Toggle Size Doubling</button>
+    <button id="forceButton">Apply Force</button>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -63,6 +107,7 @@
                 this.velX = Math.random() * 4 - 2;
                 this.velY = Math.random() * 4 - 2;
                 this.color = `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`;
+                this.collisions = 0; // Counter for collisions
             }
 
             update() {
@@ -72,11 +117,11 @@
 
                 // Bounce off walls
                 if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
-                    this.velX *= -0.8;
+                    this.velX *= -1;
                 }
                 if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
-                    this.velY *= -0.8;
-                    this.y = Math.min(canvas.height - this.radius, this.y); // Prevent particles from going below the canvas
+                    this.velY *= -1;
+                    this.y = Math.min(canvas.height - this.radius, Math.max(this.radius, this.y)); // Prevent particles from going below/above the canvas
                 }
             }
 
@@ -93,6 +138,19 @@
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 return distance < this.radius + otherParticle.radius;
             }
+
+            doubleSize() {
+                if (this.collisions < 2) {
+                    this.radius *= 2;
+                    this.collisions++;
+                }
+            }
+
+            applyForce(forceX, forceY) {
+                // Apply a force to the particle
+                this.velX += forceX;
+                this.velY += forceY;
+            }
         }
 
         // Set up the canvas
@@ -101,6 +159,8 @@
         const particles = []; // Array to store particles
         let isMouseDown = false;
         let lastMousePosition = { x: 0, y: 0 };
+        let doubleSizeOnCollision = false;
+        let applyingForce = false;
 
         // Update canvas size based on window size
         function updateCanvasSize() {
@@ -139,7 +199,31 @@
                         particle.velY = otherParticle.velY;
                         otherParticle.velX = tempVelX;
                         otherParticle.velY = tempVelY;
+
+                        // Double size on collision if the flag is set
+                        if (doubleSizeOnCollision) {
+                            particle.doubleSize();
+                            otherParticle.doubleSize();
+
+                            // Adjust positions to avoid sticking together
+                            const angle = Math.atan2(otherParticle.y - particle.y, otherParticle.x - particle.x);
+                            const overlap = particle.radius + otherParticle.radius - Math.sqrt((particle.x - otherParticle.x) ** 2 + (particle.y - otherParticle.y) ** 2);
+                            const moveX = overlap * Math.cos(angle) / 2;
+                            const moveY = overlap * Math.sin(angle) / 2;
+
+                            particle.x -= moveX;
+                            particle.y -= moveY;
+                            otherParticle.x += moveX;
+                            otherParticle.y += moveY;
+                        }
                     }
+                }
+
+                // Apply force to particles if the force is being applied
+                if (applyingForce) {
+                    const forceX = 0.2; // Adjust the force as needed
+                    const forceY = 0.2;
+                    particle.applyForce(forceX, forceY);
                 }
             }
 
@@ -186,6 +270,23 @@
         const clearButton = document.getElementById("clearButton");
         clearButton.addEventListener('click', () => {
             particles.length = 0; // Clear the particles array
+        });
+
+        // Button to toggle size doubling
+        const sizeToggleButton = document.getElementById("sizeToggleButton");
+        sizeToggleButton.addEventListener('click', () => {
+            doubleSizeOnCollision = !doubleSizeOnCollision;
+            sizeToggleButton.textContent = doubleSizeOnCollision ? 'Stop Size Doubling' : 'Toggle Size Doubling';
+        });
+
+        // Button to apply force
+        const forceButton = document.getElementById("forceButton");
+        forceButton.addEventListener('mousedown', () => {
+            applyingForce = true;
+        });
+
+        forceButton.addEventListener('mouseup', () => {
+            applyingForce = false;
         });
 
         // Start the game loop
